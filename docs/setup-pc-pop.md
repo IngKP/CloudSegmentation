@@ -72,7 +72,20 @@ cd ~/Work/IngKP/CloudSegmentation
 codex
 ```
 
-The next milestone is to reproduce PyTorch inference for the four manifest
-entries and produce a controlled CPU benchmark before selecting an export
-target.
+Phases 1–3 are complete. Verify the selected private ONNX artifacts with:
 
+```bash
+rtk uv run --locked python scripts/verify_optimized_artifacts.py
+```
+
+Stage and verify the two private prepared samples in `cloudseg_export`:
+
+```bash
+rtk /home/kittipat/miniconda3/envs/cloudseg_export/bin/python \
+  scripts/stage_research_artifacts.py --sample-mode
+rtk /home/kittipat/miniconda3/envs/cloudseg_export/bin/python \
+  scripts/stage_research_artifacts.py --sample-mode --verify-only
+```
+
+The local service and Docker commands are documented in the README. The next
+milestone is Phase 4; Google Cloud setup remains deferred.

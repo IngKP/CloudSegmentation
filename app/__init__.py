@@ -1,0 +1,1 @@
+"""CloudSegmentation serving application."""

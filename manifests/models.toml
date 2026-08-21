@@ -9,6 +9,10 @@ label = "U-Net VV+VH"
 architecture = "unet"
 channels = ["VV", "VH"]
 seed = 42
+research_job = "unet_ch_01_seed42"
+accuracy_jobs = ["unet_ch_01_seed42", "unet_ch_01_seed1337", "unet_ch_01_seed2026"]
+accuracy_source = "experiments/publication/jobs/{job_id}/test_metrics.json"
+model_config = { architecture = "unet", in_channels = 2, out_channels = 1, features = [64, 128, 256, 512], pretrained = false }
 remote = "gdrive:SARfloodEstimation/checkpoints/publication/unet_ch_01_seed42/best_model.pth"
 filename = "best_model.pth"
 bytes = 372612417
@@ -21,6 +25,10 @@ label = "U-Net five-channel"
 architecture = "unet"
 channels = ["VV", "VH", "DEM", "HAND", "Water"]
 seed = 42
+research_job = "unet_ch_01234_seed42"
+accuracy_key = "unet_full"
+accuracy_source = "weekly_report/wacv_2027/generated/architecture_results.csv"
+model_config = { architecture = "unet", in_channels = 5, out_channels = 1, features = [64, 128, 256, 512], pretrained = false }
 remote = "gdrive:SARfloodEstimation/checkpoints/publication/unet_ch_01234_seed42/best_model.pth"
 filename = "best_model.pth"
 bytes = 372633153
@@ -33,6 +41,10 @@ label = "ResNet34-U-Net five-channel"
 architecture = "resnet34_unet"
 channels = ["VV", "VH", "DEM", "HAND", "Water"]
 seed = 42
+research_job = "arch_resnet34_seed42"
+accuracy_key = "arch_resnet34"
+accuracy_source = "weekly_report/wacv_2027/generated/architecture_results.csv"
+model_config = { architecture = "resnet34_unet", in_channels = 5, out_channels = 1, pretrained = false }
 remote = "gdrive:SARfloodEstimation/checkpoints/publication/arch_resnet34_seed42/best_model.pth"
 filename = "best_model.pth"
 bytes = 293632041
@@ -45,9 +57,12 @@ label = "Cross-modal Swin-UNet student five-channel"
 architecture = "swin_unet"
 channels = ["VV", "VH", "DEM", "HAND", "Water"]
 seed = 42
+research_job = "garg_benchmark_seed42"
+accuracy_key = "xmodal_full"
+accuracy_source = "weekly_report/wacv_2027/generated/architecture_results.csv"
+model_config = { architecture = "swin_unet", encoder_name = "tu-swin_tiny_patch4_window7_224", in_channels = 5, out_channels = 1, pretrained = false }
 remote = "gdrive:SARfloodEstimation/checkpoints/publication/garg_benchmark_seed42/student_best_model.pth"
 filename = "student_best_model.pth"
 bytes = 379846803
 sha256 = "730ca50ec81f90c6d347a373823756d13ae5ee1102c7735733330a71ad53ccb9"
 release_policy = "private_manual_approval"
-

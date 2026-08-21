@@ -122,19 +122,16 @@ Start with:
 
 # 4. Model Selection: Do This Before Building the API
 
-Do **not automatically deploy the Swin-UNet checkpoint with the historical
-0.7114 best-run score**.
+The focused audit is complete. It did not select a model from the historical
+`0.7114` best individual run; it compared seed-42 runtime representatives while
+using archived three-seed all-water IoU for accuracy.
 
-First benchmark the candidate models on CPU.
-
-Start with this focused Pareto set:
-
-| Model                            | Repeated IoU | Parameters | Model Size | CPU Latency | Peak RAM |
-| -------------------------------- | -----------: | ---------: | ---------: | ----------: | -------: |
-| 2-channel U-Net                  |      ~0.6804 |            |            |             |          |
-| 5-channel U-Net                  |       0.6820 |      31.0M |            |             |          |
-| 5-channel ResNet34-U-Net         |       0.6794 |      24.4M |            |             |          |
-| 5-channel cross-modal Swin-UNet  |       0.7045 |      31.6M |            |             |          |
+| Model | Repeated IoU | Parameters | Checkpoint | CPU p50 | GPU p50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2-channel U-Net | 0.6804 | 31.0M | 372.6 MB | 32,753 ms | 46.9 ms |
+| 5-channel U-Net | 0.6820 | 31.0M | 372.6 MB | 17,958 ms | 47.1 ms |
+| 5-channel ResNet34-U-Net | 0.6794 | 24.4M | 293.6 MB | 2,529 ms | 13.6 ms |
+| 5-channel cross-modal Swin-UNet | **0.7045** | 31.6M | 379.8 MB | **214 ms** | 22.1 ms |
 
 Use seed-42 checkpoints as architecture/runtime representatives, but use the
 three-seed research summaries for accuracy comparisons. Select any final
@@ -158,10 +155,11 @@ Measure:
 * checkpoint/model size
 * repeated all-water IoU
 
-The deployment model should be selected from the **repeated-accuracy / latency
-Pareto frontier**. The 2-channel U-Net is the leading hypothesis because it is
-within roughly `0.024` IoU of the best repeated mean while eliminating DEM,
-HAND, and retrospective WorldCover inputs. Measurements must confirm it.
+The deployment model was selected from the **repeated-accuracy / latency Pareto
+frontier**. Phase 1 rejected the initial two-channel U-Net hypothesis: the
+cross-modal Swin-UNet student combined the best repeated IoU with the fastest
+focused CPU estimate. See `docs/model-selection.md` for the exact protocol and
+its limitations.
 
 A reasonable decision rule is:
 
@@ -171,21 +169,21 @@ A reasonable decision rule is:
 
 Do not force this threshold if the actual results tell a different story.
 
-The resulting README should be able to say something like:
-
-> The research-oriented Swin-UNet achieved the best IoU, while the smaller U-Net was selected for cloud deployment because it reduced CPU inference latency and memory substantially for only a small accuracy loss.
-
-That is a strong ML-engineering story.
+The resulting evidence supports a different story than originally expected:
+the research-oriented Swin-UNet was also the strongest deployment candidate in
+the focused audit. The README and model-selection report now state that result.
 
 ---
 
 # 5. Optimization Strategy
 
-Do optimization in increasing order of complexity.
+Optimization was performed in increasing order of complexity. Phase 2 is
+complete; the results below use only two fixed images and are feasibility
+evidence, not a full accuracy evaluation.
 
-## Stage A — Baseline PyTorch
+## Stage A — Baseline PyTorch (complete)
 
-Take the selected U-Net checkpoint and create a clean standalone inference script:
+The selected cross-modal Swin-UNet has a standalone inference adapter:
 
 ```text
 input tensor
@@ -196,17 +194,15 @@ input tensor
 → mask
 ```
 
-No training code should be required.
-
-Benchmark this first.
+No training operation is required. The adapter verifies the research commit,
+checkpoint hash, model configuration, channel ordering, and preprocessing.
 
 ---
 
-## Stage B — Export to ONNX
+## Stage B — Export to ONNX (complete)
 
-Export the model to ONNX.
-
-Run inference using **ONNX Runtime CPU**.
+The selected model was exported to fixed-shape FP32 ONNX and run with **ONNX
+Runtime CPU** in the serving environment.
 
 Compare:
 
@@ -216,35 +212,26 @@ vs
 ONNX Runtime FP32
 ```
 
-Check:
-
-* numerical agreement
-* IoU agreement
-* latency
-* RAM
-* model size
-
-If ONNX provides good performance, use ONNX Runtime in the production container rather than shipping the full PyTorch training environment.
+Across two fixed samples, FP32 ONNX and PyTorch had maximum absolute score error
+`2.98e-6` and 100% thresholded-mask agreement. The 134.95 MB FP32 ONNX artifact
+is the serving candidate, so the production container does not need PyTorch or
+the research environment.
 
 ---
 
-## Stage C — Quantization
+## Stage C — Quantization (complete, experimental)
 
-If the deployed model is a CNN/U-Net, test **static INT8 quantization**.
+Static INT8 and weight-only INT4 feasibility artifacts were produced from two
+fixed samples.
 
-ONNX Runtime specifically recommends static quantization for CNN-style models, using calibration samples to determine activation quantization parameters.
+| Version | Size | ORT CPU p50 | Mask agreement vs FP32 | Decision |
+| --- | ---: | ---: | ---: | --- |
+| ONNX FP32 | 134.95 MB | 767 ms | 100% | Deployment candidate |
+| ONNX INT8 | 122.63 MB | 641 ms | 99.916% | Experimental |
+| ONNX INT4 | 39.80 MB | 764 ms | 99.911% | Experimental |
 
-Use a subset of existing training/validation tiles as calibration data.
-
-Compare:
-
-| Version      | IoU | Size | p50 latency | RAM |
-| ------------ | --: | ---: | ----------: | --: |
-| PyTorch FP32 |     |      |             |     |
-| ONNX FP32    |     |      |             |     |
-| ONNX INT8    |     |      |             |     |
-
-Keep INT8 only if the accuracy loss is acceptable.
+Neither quantized model is promoted because two images are insufficient for a
+defensible accuracy decision.
 
 ---
 
@@ -261,15 +248,8 @@ If model size/runtime is still problematic, investigate:
 * deploying an already smaller U-Net architecture
 * retraining/distilling a smaller student
 
-But only do this if ONNX + model selection is insufficient.
-
-The preferred path is:
-
-> existing smaller model → ONNX → quantization
-
-rather than:
-
-> complex pruning → retraining → debugging
+This is deferred. The verified FP32 ONNX model is sufficient to begin the local
+API, and pruning would require a separate research and validation effort.
 
 ---
 
@@ -392,13 +372,13 @@ Include a small section such as:
 
 ## Model Trade-off
 
-|              | Research Model        | Deployment Model  |
-| ------------ | --------------------- | ----------------- |
-| Architecture | Cross-modal Swin-UNet | Optimized U-Net   |
-| All-water IoU| 0.7045 three-seed mean| TBD               |
-| Model size   | TBD                   | TBD               |
-| CPU latency  | TBD                   | TBD               |
-| Purpose      | Maximum accuracy      | Efficient serving |
+|              | Research Model              | Deployment Model       |
+| ------------ | --------------------------- | ---------------------- |
+| Architecture | Cross-modal Swin-UNet       | Cross-modal Swin-UNet  |
+| All-water IoU| 0.7045 three-seed mean      | 0.7045 archived mean   |
+| Artifact size| 379.85 MB checkpoint        | 134.95 MB FP32 ONNX    |
+| CPU latency  | 214 ms focused PyTorch estimate | 767 ms ORT p50, one thread |
+| Purpose      | Accuracy-oriented reference | Reproducible CPU serving |
 
 The research model result can be precomputed and must be labeled as a repeated
 benchmark estimate. The best individual `0.7114` run may be shown only with
@@ -406,7 +386,9 @@ that qualification.
 
 Only the deployment model needs to run live in Cloud Run.
 
-This turns the difference between models into part of the project's story rather than a weakness.
+The audit showed that the best research model was also the strongest deployment
+candidate under the focused protocol. That evidence replaces the original
+assumption that deployment would necessarily require a simpler U-Net.
 
 ---
 
@@ -820,6 +802,8 @@ Even if the live service is later disabled, the portfolio evidence remains.
 
 ## Phase 1 — Model Audit
 
+**Status: complete.** See `docs/model-selection.md`.
+
 **Estimated difficulty: 2/5**
 
 * collect candidate checkpoints
@@ -834,6 +818,9 @@ Even if the live service is later disabled, the portfolio evidence remains.
 
 ## Phase 2 — Optimize Inference
 
+**Status: complete.** FP32 ONNX is the deployment candidate; INT8 and INT4 are
+experimental two-image feasibility artifacts. See `docs/model-selection.md`.
+
 **Estimated difficulty: 3/5**
 
 * export selected model to ONNX
@@ -847,6 +834,10 @@ Even if the live service is later disabled, the portfolio evidence remains.
 ---
 
 ## Phase 3 — Local API
+
+**Status: complete.** The selected FP32 model is loaded once by a checksum-
+verified FastAPI service. Private prepared samples and the model are mounted
+read-only into a CPU-only Docker container.
 
 **Estimated difficulty: 2/5**
 

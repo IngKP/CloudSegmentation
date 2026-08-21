@@ -31,5 +31,5 @@ dist/
 *.egg-info/
 .idea/
 .vscode/
+.serena/
 .DS_Store
-

@@ -1,0 +1,36 @@
+schema_version = 1
+source_repository = "IngKP/SARfloodEstimation"
+source_commit = "9d9430fd1d53d7fbb21e63a4be2bd4b47177b7a6"
+selected_model = "garg_benchmark_seed42"
+deployment_variant = "fp32"
+artifact_root = ".artifacts/onnx/garg_benchmark_seed42"
+input_name = "input"
+output_name = "score_map"
+input_shape = [1, 5, 512, 512]
+channels = ["VV", "VH", "DEM", "HAND", "Water"]
+target_semantics = "Sen1Floods11 released all-water mask"
+
+[[artifacts]]
+variant = "fp32"
+filename = "model.fp32.onnx"
+opset = 18
+bytes = 134949341
+sha256 = "36628caa6289da9fa76d93369525b1d5a0a35d4cd2ecfbcabcf775d6dfb85b88"
+release_policy = "private_manual_approval"
+status = "deployment_candidate"
+
+[[artifacts]]
+variant = "int8"
+filename = "model.int8.onnx"
+bytes = 122634472
+sha256 = "30250804f2b0a8bd2eedacf90447153dfbb913cacb68b0af7c890e1552e2e376"
+release_policy = "experimental_not_approved"
+status = "experimental_two_image_calibration"
+
+[[artifacts]]
+variant = "int4"
+filename = "model.int4.onnx"
+bytes = 39798601
+sha256 = "707428622d6feaad95163fd147184c3ea876a1d2a7e8adbfeeed452e49d61920"
+release_policy = "experimental_not_approved"
+status = "experimental_weight_only"

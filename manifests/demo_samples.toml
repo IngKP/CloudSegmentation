@@ -1,0 +1,22 @@
+schema_version = 1
+source_repository = "IngKP/SARfloodEstimation"
+source_commit = "9d9430fd1d53d7fbb21e63a4be2bd4b47177b7a6"
+artifact_root = ".artifacts/samples"
+format = "npz"
+target_semantics = "Sen1Floods11 HandLabeled surface-water mask; -1 denotes invalid pixels"
+
+[[samples]]
+id = "Sri-Lanka_713926"
+filename = "Sri-Lanka_713926.npz"
+bytes = 2585076
+sha256 = "1efd5b6023f808b0ad18160336894179eba6660bf1e7e35f05d78b234c614e53"
+shape = [5, 512, 512]
+label_shape = [512, 512]
+
+[[samples]]
+id = "India_80221"
+filename = "India_80221.npz"
+bytes = 2067100
+sha256 = "e72590324521ab45d28b05b3fc1b3b06f0fb7bc1bb56be06b46c235c306c5f2b"
+shape = [5, 512, 512]
+label_shape = [512, 512]
