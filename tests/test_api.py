@@ -12,7 +12,12 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.artifacts import encode_score_map
+from app.artifacts import (
+    encode_reference,
+    encode_sar_visualization,
+    encode_score_map,
+    encode_score_preview,
+)
 from app.config import Settings
 from app.main import create_app
 
@@ -115,6 +120,28 @@ def test_score_map_rejects_invalid_values(value: float) -> None:
         encode_score_map(scores)
 
 
+def test_score_preview_quantization_is_bounded() -> None:
+    scores = np.linspace(0.0, 1.0, 512 * 512, dtype=np.float32).reshape(512, 512)
+    decoded = np.asarray(Image.open(io.BytesIO(encode_score_preview(scores))), dtype=np.uint8)
+    reconstructed = decoded.astype(np.float32) / 255.0
+    assert np.max(np.abs(reconstructed - scores)) <= 1.0 / 255.0
+
+
+def test_visual_encodings_preserve_documented_values() -> None:
+    tensor = np.zeros((5, 512, 512), dtype=np.float32)
+    tensor[0, 0, 0] = 1.0
+    tensor[1, 0, 1] = 1.0
+    sar = np.asarray(Image.open(io.BytesIO(encode_sar_visualization(tensor))), dtype=np.uint8)
+    assert tuple(sar[0, 0]) == (128, 128, 128)
+    assert tuple(sar[0, 1]) == (128, 128, 128)
+    labels = np.array([[-1, 0], [1, 0]], dtype=np.int8)
+    # The production shape is fixed at 512 x 512.
+    padded = np.zeros((512, 512), dtype=np.int8)
+    padded[:2, :2] = labels
+    reference = np.asarray(Image.open(io.BytesIO(encode_reference(padded))), dtype=np.uint8)
+    assert reference[:2, :2].tolist() == [[255, 0], [1, 0]]
+
+
 def test_api_contract_and_single_session(tmp_path: Path) -> None:
     settings, session = make_settings(tmp_path)
     factory_calls = 0
@@ -127,6 +154,10 @@ def test_api_contract_and_single_session(tmp_path: Path) -> None:
         return session
 
     with TestClient(create_app(settings, factory)) as client:
+        dashboard = client.get("/")
+        assert dashboard.status_code == 200
+        assert "CloudSegmentation" in dashboard.text
+        assert client.get("/static/app.js").status_code == 200
         health = client.get("/health")
         assert health.status_code == 200
         assert health.json() == {
@@ -147,7 +178,17 @@ def test_api_contract_and_single_session(tmp_path: Path) -> None:
         decoded = Image.open(io.BytesIO(base64.b64decode(body["score_map"])))
         assert decoded.size == (512, 512)
         assert body["score_map_encoding"] == "png16-base64; score=uint16/65535"
+        preview = Image.open(io.BytesIO(base64.b64decode(body["score_map_preview"])))
+        assert preview.mode == "L"
+        assert body["score_map_preview_encoding"] == "png8-base64; score=rint(score*255)/255"
         assert body["score_map_shape"] == [512, 512]
+        for path in ("/samples/demo/sar.png", "/samples/demo/reference.png"):
+            visual = client.get(path)
+            assert visual.status_code == 200
+            assert visual.headers["content-type"] == "image/png"
+            assert visual.headers["cache-control"] == "private, max-age=3600"
+            assert Image.open(io.BytesIO(visual.content)).size == (512, 512)
+        assert client.get("/samples/missing/sar.png").status_code == 404
         assert client.post("/predict", json={"sample_id": "missing"}).status_code == 404
         assert client.post("/predict", json={"sample_id": "demo", "extra": 1}).status_code == 422
 

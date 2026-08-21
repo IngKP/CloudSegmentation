@@ -31,6 +31,7 @@ RUN groupadd --system --gid 10001 cloudseg \
 WORKDIR /srv/cloudseg
 COPY --from=dependencies /opt/venv /opt/venv
 COPY app ./app
+COPY frontend ./frontend
 COPY manifests ./manifests
 
 RUN chown -R cloudseg:cloudseg /srv/cloudseg

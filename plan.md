@@ -854,6 +854,11 @@ read-only into a CPU-only Docker container.
 
 ## Phase 4 — Demo UI
 
+**Status: complete.** The FastAPI service now serves a same-origin interactive
+gallery for the two verified private samples. Live inference returns a canonical
+PNG16 score map and a browser preview; threshold changes update visualization
+and valid-pixel metrics locally without rerunning the model.
+
 **Estimated difficulty: 2–3/5**
 
 * curated sample gallery

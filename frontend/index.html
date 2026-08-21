@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CloudSegmentation SAR surface-water inference demo">
+    <title>CloudSegmentation · SAR surface-water demo</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/legends.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">◒</span><span>CloudSegmentation</span></div>
+      <span class="status-pill"><i aria-hidden="true"></i> local inference</span>
+    </header>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">SAR / SURFACE WATER · PHASE 4</p>
+          <h1>Read the model’s<br><em>decision surface.</em></h1>
+          <p class="lede">A compact, reproducible Sentinel-1 segmentation demo. Explore how a model-score threshold changes the map—without rerunning inference.</p>
+        </div>
+        <aside class="caveat" role="note"><span class="caveat-icon" aria-hidden="true">!</span><div><strong>Interpretation note</strong><p>The Sen1Floods11 target contains all surface water, not transient flood events. Scores are model sensitivity—not calibrated risk probabilities.</p></div></aside>
+      </section>
+
+      <section class="control-card" aria-labelledby="scene-heading">
+        <div class="section-heading"><div><p class="eyebrow">01 / CURATED SCENES</p><h2 id="scene-heading">Choose a scene</h2></div><span id="sample-count" class="muted"></span></div>
+        <div id="gallery" class="gallery" aria-live="polite"><div class="skeleton"></div><div class="skeleton"></div></div>
+      </section>
+
+      <section id="workspace" class="workspace hidden" aria-labelledby="results-heading">
+        <div class="section-heading"><div><p class="eyebrow">02 / INFERENCE EXPLORER</p><h2 id="results-heading">See the signal</h2></div><div id="run-state" class="run-state" role="status"></div></div>
+        <div class="toolbar">
+          <button id="run-button" class="primary" type="button">Run inference <span aria-hidden="true">→</span></button>
+          <label class="threshold">Model-score threshold <output id="threshold-value">0.50</output><input id="threshold" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Model-score threshold"></label>
+        </div>
+        <div id="error" class="error hidden" role="alert"></div>
+        <div class="meta-row"><span id="scene-label"></span><span id="model-label"></span><span id="latency-label"></span></div>
+        <div class="visual-grid">
+          <figure><figcaption><span>01</span> SAR input <small>VV + VH grayscale</small></figcaption><canvas id="sar-canvas" width="512" height="512"></canvas><div class="legend"><span><i class="swatch sar-dark"></i>Lower backscatter</span><span><i class="swatch sar-light"></i>Higher backscatter</span></div></figure>
+          <figure><figcaption><span>02</span> Model score <small>not a calibrated probability</small></figcaption><canvas id="score-canvas" width="512" height="512"></canvas><div class="legend legend-scale"><span>0 · low water score</span><i class="score-ramp" aria-hidden="true"></i><span>1 · high water score</span></div></figure>
+          <figure><figcaption><span>03</span> Binary prediction <small id="prediction-caption">threshold ≥ 0.50</small></figcaption><canvas id="prediction-canvas" width="512" height="512"></canvas><div class="legend"><span><i class="swatch predicted-land"></i>Predicted land</span><span><i class="swatch predicted-water"></i>Predicted water</span></div></figure>
+          <figure><figcaption><span>04</span> Prediction overlay <small>prediction on grayscale SAR</small></figcaption><canvas id="overlay-canvas" width="512" height="512"></canvas><div class="legend"><span><i class="swatch sar-base"></i>SAR background</span><span><i class="swatch overlay-water"></i>Predicted water</span></div></figure>
+          <figure><figcaption><span>05</span> Ground-truth reference <small>used to calculate metrics</small></figcaption><canvas id="reference-canvas" width="512" height="512"></canvas><div class="legend"><span><i class="swatch reference-land"></i>Reference land</span><span><i class="swatch reference-water"></i>Reference water</span><span><i class="swatch invalid"></i>No reference; excluded</span></div></figure>
+          <figure><figcaption><span>06</span> Prediction errors <small>against ground truth</small></figcaption><canvas id="error-canvas" width="512" height="512"></canvas><div class="legend"><span><i class="swatch true-positive"></i>Correct water (TP)</span><span><i class="swatch false-positive"></i>False water (FP)</span><span><i class="swatch false-negative"></i>Missed water (FN)</span><span><i class="swatch correct-land"></i>Correct land</span><span><i class="swatch invalid"></i>No reference</span></div></figure>
+        </div>
+        <div class="stats" aria-live="polite"><div><span>IoU</span><strong id="iou">—</strong></div><div><span>Precision</span><strong id="precision">—</strong></div><div><span>Recall</span><strong id="recall">—</strong></div><div class="valid"><span>Ground-truth pixels evaluated</span><strong id="valid-pixels">—</strong></div></div>
+        <p class="metric-note"><strong>Per-scene diagnostic only.</strong> These two curated tiles are unusually high-performing examples selected for export and UI verification. Their scores are not an estimate of dataset-wide performance; the archived three-seed all-water IoU is 0.7045.</p>
+      </section>
+
+      <section class="tradeoff" aria-labelledby="tradeoff-heading"><div class="section-heading"><div><p class="eyebrow">03 / MODEL CONTEXT</p><h2 id="tradeoff-heading">Research vs deployment</h2></div></div><div class="table-wrap"><table><thead><tr><th></th><th>Research model</th><th>Deployment model</th></tr></thead><tbody><tr><th>Architecture</th><td>Cross-modal Swin-UNet</td><td>Cross-modal Swin-UNet</td></tr><tr><th>All-water IoU</th><td>0.7045 three-seed mean</td><td>0.7045 archived mean</td></tr><tr><th>Artifact size</th><td>379.85 MB checkpoint</td><td>134.95 MB FP32 ONNX</td></tr><tr><th>CPU latency</th><td>214 ms focused PyTorch estimate</td><td>767 ms ORT p50, one thread</td></tr><tr><th>Purpose</th><td>Accuracy-oriented reference</td><td>Reproducible CPU serving</td></tr></tbody></table></div></section>
+    </main>
+    <footer><span>CloudSegmentation</span><span>Five-channel SAR · CPU inference · 512 × 512</span></footer>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

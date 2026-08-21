@@ -12,7 +12,7 @@ mapping readiness.
 
 ## Current phase
 
-Phases 1–3 are complete. The focused audit compared:
+Phases 1–4 are complete. The focused audit compared:
 
 - 2-channel U-Net (VV + VH)
 - 5-channel U-Net (VV + VH + DEM + HAND + Water)
@@ -27,15 +27,28 @@ checks; INT8 and INT4 results remain experimental.
 
 See [`docs/model-selection.md`](docs/model-selection.md) for the complete
 protocol, limitations, and optimization results. The selected model now runs
-in a local FastAPI service and a CPU-only Docker image. The next milestone is
-the interactive demo UI.
+in a local FastAPI service and CPU-only Docker image with an interactive,
+threshold-sensitive visualization dashboard. The next milestone is Cloud Run
+deployment.
 
 ## Local inference API
 
-The service exposes `GET /health`, `GET /samples`, and `POST /predict`. It
-accepts only curated sample IDs and returns the live model-score map as a
-base64-encoded 16-bit PNG. The scores are sensitivity values, not calibrated
-probabilities; decode them as `uint16 / 65535` before applying a UI threshold.
+The service exposes `GET /health`, `GET /samples`, sample visualization routes,
+and `POST /predict`. It accepts only curated sample IDs and returns the live
+model-score map as a base64-encoded 16-bit PNG. The scores are sensitivity
+values, not calibrated probabilities; decode the canonical map as
+`uint16 / 65535`.
+
+For browser visualization, `/predict` also returns a lossless PNG containing
+scores quantized to `round(score * 255) / 255`. The dashboard uses this preview
+to update the thresholded mask, overlay, IoU, precision, and recall locally;
+moving the slider does not rerun inference. Invalid reference pixels are
+excluded from all metrics.
+
+The two current scenes were selected for export fidelity and interface
+verification, not as a representative performance sample. Their per-scene
+metrics are diagnostic examples and must not replace the archived three-seed
+all-water IoU estimate.
 
 Prepare and verify the two private samples in the isolated export environment:
 
@@ -64,7 +77,9 @@ rtk docker run --rm -p 8080:8080 \
   cloudsegmentation:phase3
 ```
 
-Open `http://127.0.0.1:8080/docs`, or request inference with:
+Open `http://127.0.0.1:8080/` for the two-scene interactive gallery or
+`http://127.0.0.1:8080/docs` for the API schema. You can also request inference
+directly with:
 
 ```bash
 rtk curl -X POST http://127.0.0.1:8080/predict \
@@ -84,7 +99,7 @@ private, untracked, and verified from [`manifests/models.toml`](manifests/models
 ## Project direction
 
 The complete implementation plan is in [`plan.md`](plan.md). The next milestone
-is Phase 4: a local gallery and threshold-sensitive visualization UI.
+is Phase 5: checksum-verified artifact delivery and deployment to Cloud Run.
 
 ## License
 

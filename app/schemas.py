@@ -35,3 +35,5 @@ class PredictResponse(StrictModel):
     score_map: str
     score_map_encoding: str
     score_map_shape: list[int]
+    score_map_preview: str
+    score_map_preview_encoding: str

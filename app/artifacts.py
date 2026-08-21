@@ -102,3 +102,49 @@ def encode_score_map(score_map: np.ndarray) -> bytes:
     output = io.BytesIO()
     Image.fromarray(quantized).save(output, format="PNG", optimize=False)
     return output.getvalue()
+
+
+def encode_score_preview(score_map: np.ndarray) -> bytes:
+    """Encode scores as a browser-friendly lossless 8-bit PNG preview."""
+    scores = np.asarray(score_map, dtype=np.float32)
+    if scores.shape != (512, 512):
+        raise ValueError(f"unexpected score-map shape: {scores.shape}")
+    if not np.isfinite(scores).all():
+        raise ValueError("score map contains non-finite values")
+    if np.any(scores < 0.0) or np.any(scores > 1.0):
+        raise ValueError("score map is outside [0, 1]")
+    quantized = np.rint(scores * 255.0).astype(np.uint8)
+    output = io.BytesIO()
+    Image.fromarray(quantized).save(output, format="PNG", optimize=False)
+    return output.getvalue()
+
+
+def encode_sar_visualization(tensor: np.ndarray) -> bytes:
+    """Encode normalized VV/VH channels as a neutral grayscale SAR composite."""
+    values = np.asarray(tensor, dtype=np.float32)
+    if values.shape != (5, 512, 512):
+        raise ValueError(f"unexpected input tensor shape: {values.shape}")
+    if not np.isfinite(values).all():
+        raise ValueError("input tensor contains non-finite values")
+    vv = np.clip(values[0], 0.0, 1.0)
+    vh = np.clip(values[1], 0.0, 1.0)
+    intensity = (vv + vh) / 2.0
+    composite = np.repeat(intensity[..., np.newaxis], 3, axis=-1)
+    output = io.BytesIO()
+    Image.fromarray(np.rint(composite * 255.0).astype(np.uint8)).save(
+        output, format="PNG", optimize=False
+    )
+    return output.getvalue()
+
+
+def encode_reference(tensor: np.ndarray) -> bytes:
+    """Encode labels losslessly as 0=land, 1=water, and 255=invalid PNG."""
+    labels = np.asarray(tensor)
+    if labels.shape != (512, 512):
+        raise ValueError(f"unexpected reference shape: {labels.shape}")
+    if not np.isin(labels, (-1, 0, 1)).all():
+        raise ValueError("reference contains invalid classes")
+    encoded = np.where(labels == -1, 255, labels).astype(np.uint8)
+    output = io.BytesIO()
+    Image.fromarray(encoded).save(output, format="PNG", optimize=False)
+    return output.getvalue()
