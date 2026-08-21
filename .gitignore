@@ -1,0 +1,35 @@
+# Python and tooling
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+service-account*.json
+
+# Models, data, and generated results
+.artifacts/
+data/
+*.onnx
+*.pth
+*.pt
+*.ckpt
+*.npy
+*.npz
+
+# Build and editor state
+build/
+dist/
+*.egg-info/
+.idea/
+.vscode/
+.DS_Store
+

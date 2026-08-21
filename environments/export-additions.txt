@@ -1,0 +1,7 @@
+# Added only to the cloned `cloudseg_export` Conda environment.
+# Exact installed versions are recorded in export-additions.lock.txt.
+onnx
+onnxruntime
+onnxscript
+psutil
+

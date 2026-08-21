@@ -1,0 +1,53 @@
+schema_version = 1
+source_repository = "IngKP/SARfloodEstimation"
+source_commit = "9d9430fd1d53d7fbb21e63a4be2bd4b47177b7a6"
+artifact_root = ".artifacts/checkpoints"
+
+[[models]]
+id = "unet_ch_01_seed42"
+label = "U-Net VV+VH"
+architecture = "unet"
+channels = ["VV", "VH"]
+seed = 42
+remote = "gdrive:SARfloodEstimation/checkpoints/publication/unet_ch_01_seed42/best_model.pth"
+filename = "best_model.pth"
+bytes = 372612417
+sha256 = "a6a3e9d82657c105ab7f570841f3450e19e4ca0140bbd3860ab286cec20921c3"
+release_policy = "private_manual_approval"
+
+[[models]]
+id = "unet_ch_01234_seed42"
+label = "U-Net five-channel"
+architecture = "unet"
+channels = ["VV", "VH", "DEM", "HAND", "Water"]
+seed = 42
+remote = "gdrive:SARfloodEstimation/checkpoints/publication/unet_ch_01234_seed42/best_model.pth"
+filename = "best_model.pth"
+bytes = 372633153
+sha256 = "5495bf6c09f56f0bf324c0833746964a54955ea6cf7afbea47f61b26cb0645f9"
+release_policy = "private_manual_approval"
+
+[[models]]
+id = "arch_resnet34_seed42"
+label = "ResNet34-U-Net five-channel"
+architecture = "resnet34_unet"
+channels = ["VV", "VH", "DEM", "HAND", "Water"]
+seed = 42
+remote = "gdrive:SARfloodEstimation/checkpoints/publication/arch_resnet34_seed42/best_model.pth"
+filename = "best_model.pth"
+bytes = 293632041
+sha256 = "f5beade45929f0eb50ce39d668899692cc1f05e0a9b16a483bd881108eda2cb8"
+release_policy = "private_manual_approval"
+
+[[models]]
+id = "garg_benchmark_seed42"
+label = "Cross-modal Swin-UNet student five-channel"
+architecture = "swin_unet"
+channels = ["VV", "VH", "DEM", "HAND", "Water"]
+seed = 42
+remote = "gdrive:SARfloodEstimation/checkpoints/publication/garg_benchmark_seed42/student_best_model.pth"
+filename = "student_best_model.pth"
+bytes = 379846803
+sha256 = "730ca50ec81f90c6d347a373823756d13ae5ee1102c7735733330a71ad53ccb9"
+release_policy = "private_manual_approval"
+
