@@ -3,7 +3,10 @@
   const SIZE = 512;
   const PIXELS = SIZE * SIZE;
   const $ = (id) => document.getElementById(id);
-  const state = { samples: [], selected: null, scores: null, reference: null, sar: null, selection: 0 };
+  const state = {
+    samples: [], selected: null, scores: null, reference: null, sar: null,
+    inferences: new Map(), selection: 0,
+  };
   const canvases = ['sar', 'score', 'prediction', 'overlay', 'reference', 'error'].reduce((items, name) => {
     items[name] = $(`${name}-canvas`);
     return items;
@@ -38,6 +41,34 @@
   function drawSar(pixels) {
     drawPixels(canvases.sar, pixels);
     state.sar = pixels;
+  }
+
+  function clearCanvas(canvas) {
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function clearSceneView() {
+    Object.values(canvases).forEach(clearCanvas);
+    state.scores = null;
+    $('error').textContent = '';
+    $('model-label').textContent = '';
+    $('latency-label').textContent = '';
+    ['iou', 'precision', 'recall', 'valid-pixels'].forEach((id) => $(id).textContent = '—');
+  }
+
+  function applyInference(inference) {
+    state.scores = inference.scores;
+    $('model-label').textContent = `${inference.modelId} · ${inference.modelVariant}`;
+    $('latency-label').textContent = `${Number(inference.latencyMs).toFixed(1)} ms`;
+    render();
+  }
+
+  function markInferenceReady(sampleId) {
+    document.querySelectorAll('.sample-card').forEach((element) => {
+      if (element.dataset.id !== sampleId) return;
+      element.classList.add('has-result');
+      element.querySelector('.sample-card-status')?.removeAttribute('hidden');
+    });
   }
 
   // Purple-orange-yellow deliberately avoids water-associated blue.
@@ -108,37 +139,54 @@
 
   async function run() {
     if (!state.selected) return;
+    const selection = state.selection;
+    const sampleId = state.selected.id;
+    const isCurrent = () => selection === state.selection && state.selected?.id === sampleId;
     setStatus('Running inference…', true);
     $('error').classList.add('hidden');
     try {
       const response = await fetch('/predict', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sample_id: state.selected.id }),
+        body: JSON.stringify({ sample_id: sampleId }),
       });
       if (!response.ok) throw new Error(`Inference failed (${response.status})`);
       const result = await response.json();
+      if (!isCurrent()) return;
       if (!result.score_map_preview) throw new Error('The PNG8 score preview is unavailable.');
       await new Promise((resolve, reject) => imagePixels(`data:image/png;base64,${result.score_map_preview}`, (pixels) => {
-        state.scores = new Float32Array(PIXELS);
-        for (let index = 0; index < PIXELS; index++) state.scores[index] = pixels[index * 4] / 255;
-        $('model-label').textContent = `${result.model_id} · ${result.model_variant}`;
-        $('latency-label').textContent = `${Number(result.latency_ms).toFixed(1)} ms`;
+        if (!isCurrent()) {
+          resolve();
+          return;
+        }
+        const scores = new Float32Array(PIXELS);
+        for (let index = 0; index < PIXELS; index++) scores[index] = pixels[index * 4] / 255;
+        const inference = {
+          scores,
+          modelId: result.model_id,
+          modelVariant: result.model_variant,
+          latencyMs: result.latency_ms,
+        };
+        state.inferences.set(sampleId, inference);
+        markInferenceReady(sampleId);
+        applyInference(inference);
         setStatus('Inference ready');
-        render();
         resolve();
       }, reject));
     } catch (error) {
-      $('error').textContent = error.message;
-      $('error').classList.remove('hidden');
-      setStatus('Inference unavailable');
+      if (isCurrent()) {
+        $('error').textContent = error.message;
+        $('error').classList.remove('hidden');
+        setStatus('Inference unavailable');
+      }
     } finally {
-      $('run-button').disabled = false;
+      if (isCurrent()) $('run-button').disabled = false;
     }
   }
 
   async function selectSample(sample) {
     const selection = ++state.selection;
     Object.assign(state, { selected: sample, scores: null, reference: null, sar: null });
+    clearSceneView();
     $('error').classList.add('hidden');
     document.querySelectorAll('.sample-card').forEach((element) =>
       element.classList.toggle('selected', element.dataset.id === sample.id));
@@ -157,7 +205,16 @@
         }
         resolve();
       }, reject));
-      if (selection === state.selection) setStatus('Ready to run');
+      if (selection === state.selection) {
+        const cached = state.inferences.get(sample.id);
+        if (cached) {
+          markInferenceReady(sample.id);
+          applyInference(cached);
+          setStatus('Inference ready');
+        } else {
+          setStatus('Ready to run');
+        }
+      }
     } catch (error) {
       if (selection === state.selection) {
         $('error').textContent = error.message;
@@ -180,7 +237,7 @@
         card.className = 'sample-card';
         card.type = 'button';
         card.dataset.id = sample.id;
-        card.innerHTML = `<span><h3>${sample.id.replaceAll('_', ' ')}</h3><p>${sample.country} · ${sample.split} · reference available</p></span><span class="sample-arrow" aria-hidden="true">↗</span>`;
+        card.innerHTML = `<span><h3>${sample.id.replaceAll('_', ' ')}</h3><p>${sample.country} · ${sample.split} · reference available</p></span><span class="sample-card-status" hidden>Inference ready</span><span class="sample-arrow" aria-hidden="true">↗</span>`;
         card.addEventListener('click', () => selectSample(sample));
         return card;
       }));
