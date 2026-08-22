@@ -43,25 +43,38 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def make_settings(tmp_path: Path) -> tuple[Settings, FakeSession]:
+def make_settings(
+    tmp_path: Path, sample_ids: tuple[str, ...] = ("demo",)
+) -> tuple[Settings, FakeSession]:
     model = tmp_path / "model.onnx"
     model.write_bytes(b"fake-model")
     sample_root = tmp_path / "samples"
     sample_root.mkdir()
-    sample = sample_root / "demo.npz"
-    np.savez(
-        sample,
-        image=np.zeros((5, 512, 512), dtype=np.float32),
-        label=np.zeros((512, 512), dtype=np.int8),
-        metadata=np.asarray(
-            json.dumps(
-                {
-                    "sample_id": "demo",
-                    "channels": ["VV", "VH", "DEM", "HAND", "Water"],
-                }
-            )
-        ),
-    )
+    sample_records = []
+    for sample_id in sample_ids:
+        sample = sample_root / f"{sample_id}.npz"
+        np.savez(
+            sample,
+            image=np.zeros((5, 512, 512), dtype=np.float32),
+            label=np.zeros((512, 512), dtype=np.int8),
+            metadata=np.asarray(
+                json.dumps(
+                    {
+                        "sample_id": sample_id,
+                        "channels": ["VV", "VH", "DEM", "HAND", "Water"],
+                    }
+                )
+            ),
+        )
+        sample_records.append(
+            f'''[[samples]]
+id = "{sample_id}"
+country = "Demo"
+split = "test"
+filename = "{sample.name}"
+bytes = {sample.stat().st_size}
+sha256 = "{_sha256(sample)}"'''
+        )
     model_manifest = tmp_path / "models.toml"
     model_manifest.write_text(
         f'''schema_version = 1
@@ -83,16 +96,7 @@ sha256 = "{_sha256(model)}"
     )
     sample_manifest = tmp_path / "samples.toml"
     sample_manifest.write_text(
-        f'''schema_version = 1
-
-[[samples]]
-id = "demo"
-country = "Demo"
-split = "test"
-filename = "demo.npz"
-bytes = {sample.stat().st_size}
-sha256 = "{_sha256(sample)}"
-''',
+        "schema_version = 1\n\n" + "\n\n".join(sample_records) + "\n",
         encoding="utf-8",
     )
     settings = Settings(
@@ -172,8 +176,11 @@ def test_api_contract_and_single_session(tmp_path: Path) -> None:
             {"id": "demo", "country": "Demo", "split": "test", "has_reference": True}
         ]
         first = client.post("/predict", json={"sample_id": "demo"})
+        assert first.status_code == 200
+        assert session.calls == 1
         second = client.post("/predict", json={"sample_id": "demo"})
         assert first.status_code == second.status_code == 200
+        assert first.json() == second.json()
         body = first.json()
         decoded = Image.open(io.BytesIO(base64.b64decode(body["score_map"])))
         assert decoded.size == (512, 512)
@@ -191,9 +198,41 @@ def test_api_contract_and_single_session(tmp_path: Path) -> None:
         assert client.get("/samples/missing/sar.png").status_code == 404
         assert client.post("/predict", json={"sample_id": "missing"}).status_code == 404
         assert client.post("/predict", json={"sample_id": "demo", "extra": 1}).status_code == 422
+        assert (
+            client.post("/predict", json={"sample_id": "demo", "threshold": 0.25}).status_code
+            == 422
+        )
 
     assert factory_calls == 1
+    assert session.calls == 1
+
+
+def test_prediction_cache_is_separate_per_sample(tmp_path: Path) -> None:
+    settings, session = make_settings(tmp_path, ("demo", "alternate"))
+
+    with TestClient(create_app(settings, lambda _path, _threads: session)) as client:
+        first_demo = client.post("/predict", json={"sample_id": "demo"})
+        first_alternate = client.post("/predict", json={"sample_id": "alternate"})
+        second_demo = client.post("/predict", json={"sample_id": "demo"})
+        second_alternate = client.post("/predict", json={"sample_id": "alternate"})
+
+    assert first_demo.status_code == first_alternate.status_code == 200
+    assert second_demo.status_code == second_alternate.status_code == 200
+    assert first_demo.json() == second_demo.json()
+    assert first_alternate.json() == second_alternate.json()
+    assert first_demo.json()["sample_id"] == "demo"
+    assert first_alternate.json()["sample_id"] == "alternate"
     assert session.calls == 2
+
+
+def test_threshold_exploration_is_client_side() -> None:
+    frontend = (Path(__file__).resolve().parents[1] / "frontend/app.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "$('threshold').addEventListener('input', render);" in frontend
+    assert frontend.count("fetch('/predict'") == 1
+    assert "body: JSON.stringify({ sample_id: sampleId })" in frontend
 
 
 def test_startup_rejects_modified_model(tmp_path: Path) -> None:

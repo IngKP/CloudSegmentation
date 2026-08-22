@@ -6,6 +6,7 @@ import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Response
@@ -80,6 +81,8 @@ def create_app(
             "samples": samples,
             "engine": engine,
             "visuals": visuals,
+            "prediction_cache": {},
+            "prediction_cache_lock": Lock(),
         }
         logger.info(
             "service_ready model_id=%s variant=%s sample_count=%d",
@@ -156,34 +159,45 @@ def create_app(
         sample = state["samples"].get(request.sample_id)
         if sample is None:
             raise HTTPException(status_code=404, detail="unknown sample ID")
-        try:
-            score_map, latency_ms = state["engine"].predict(sample.tensor)
-            encoded = base64.b64encode(encode_score_map(score_map)).decode("ascii")
-            preview = base64.b64encode(encode_score_preview(score_map)).decode("ascii")
-        except Exception:
-            logger.exception(
-                "prediction_failed sample_id=%s model_id=%s",
-                request.sample_id,
-                state["model_manifest"]["selected_model"],
+        with state["prediction_cache_lock"]:
+            cached = state["prediction_cache"].get(request.sample_id)
+            if cached is not None:
+                logger.info(
+                    "prediction_cache_hit sample_id=%s model_id=%s",
+                    request.sample_id,
+                    state["model_manifest"]["selected_model"],
+                )
+                return cached
+            try:
+                score_map, latency_ms = state["engine"].predict(sample.tensor)
+                encoded = base64.b64encode(encode_score_map(score_map)).decode("ascii")
+                preview = base64.b64encode(encode_score_preview(score_map)).decode("ascii")
+            except Exception:
+                logger.exception(
+                    "prediction_failed sample_id=%s model_id=%s",
+                    request.sample_id,
+                    state["model_manifest"]["selected_model"],
+                )
+                raise
+            prediction = PredictResponse(
+                sample_id=request.sample_id,
+                model_id=state["model_manifest"]["selected_model"],
+                model_variant=state["artifact"]["variant"],
+                latency_ms=latency_ms,
+                score_map=encoded,
+                score_map_encoding="png16-base64; score=uint16/65535",
+                score_map_shape=[512, 512],
+                score_map_preview=preview,
+                score_map_preview_encoding="png8-base64; score=rint(score*255)/255",
             )
-            raise
+            state["prediction_cache"][request.sample_id] = prediction
         logger.info(
             "prediction_complete sample_id=%s model_id=%s latency_ms=%.3f",
             request.sample_id,
             state["model_manifest"]["selected_model"],
             latency_ms,
         )
-        return PredictResponse(
-            sample_id=request.sample_id,
-            model_id=state["model_manifest"]["selected_model"],
-            model_variant=state["artifact"]["variant"],
-            latency_ms=latency_ms,
-            score_map=encoded,
-            score_map_encoding="png16-base64; score=uint16/65535",
-            score_map_shape=[512, 512],
-            score_map_preview=preview,
-            score_map_preview_encoding="png8-base64; score=rint(score*255)/255",
-        )
+        return prediction
 
     return application
 

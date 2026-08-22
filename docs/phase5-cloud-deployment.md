@@ -22,6 +22,11 @@ authenticated-only; anonymous/public inference was deliberately not enabled.
 - Every staged object is verified with the existing size/SHA-256 integrity
   mechanism before the existing sample loader and one ONNX Runtime session are
   initialized.
+- The prepared public-release code keeps one in-process prediction response
+  cache per manifest-selected sample. The first request for each fixed sample
+  runs ONNX; repeated requests on the same warm instance return the cached
+  response without another inference. The cache is reset with the ephemeral
+  Cloud Run instance and does not expose model or sample objects.
 - If the GCS variables are absent, the existing local filesystem paths remain
   active. The production Docker image contains application code and manifests
   only; model and NPZ files are not copied into it.
@@ -186,6 +191,36 @@ Before any public access:
 
 A spend cap should be treated as the final financial backstop, not the first line of defense.
 
+## Public-release preparation status
+
+The application is prepared for a low-traffic portfolio architecture without
+changing the private Cloud Run service. The request-cost split is:
+
+| Route group | Request-time cost |
+| --- | --- |
+| `/`, `/static/*`, `/docs`, `/redoc`, `/docs/oauth2-redirect`, `/openapi.json`, `/health`, `/samples` | File or metadata response; no model inference |
+| `/samples/{sample_id}/sar.png` and `/reference.png` | Startup-prepared PNG bytes; no model inference |
+| `POST /predict` | ONNX Runtime and score-map encoding; the only request route with meaningful model compute |
+
+The frontend's threshold slider operates on the returned score preview and
+local reference pixels. It does not call `/predict`. The server-side cache is
+per instance and per known sample ID: one inference populates each entry, and
+repeated requests for that sample return the same response without executing
+ONNX again. Cache state disappears with scale-to-zero or a new revision.
+
+The [official Sen1Floods11 repository](https://github.com/cloudtostreet/Sen1Floods11)
+documents GCS access, identifies Cloud to Street as the data generator, and
+requests citation of Bonafilia et al. It does not state a dataset license or
+explicitly grant public display or redistribution rights. The official
+[CVPR paper page](https://openaccess.thecvf.com/content_CVPRW_2020/html/w11/Bonafilia_Sen1Floods11_A_Georeferenced_Dataset_to_Train_and_Test_Deep_Learning_CVPRW_2020_paper.html)
+describes the dataset and links to its source repository, but does not resolve
+those file-use rights. The repository's still-open
+[missing-license issue](https://github.com/cloudtostreet/Sen1Floods11/issues/18)
+has no maintainer licensing response. Therefore, attribution is included in
+the UI and README, but it is not being treated as permission. Public display
+or redistribution of the two derived demo samples remains blocked pending
+written permission or replacement with authorized assets.
+
 ## Public-release gate
 
 Anonymous access is **not part of the initial deployment**.
@@ -211,13 +246,30 @@ Before making the Cloud Run service public, all of the following must be true:
 
 If the demo is later made public, protect the expensive route separately from the static/read-only routes.
 
-`GET /`, `/static/*`, `/health`, `/samples`, and cached visualization routes are cheap. `POST /predict` performs model inference and is the cost-sensitive operation.
+`GET /`, `/static/*`, `/health`, `/samples`, and cached visualization routes are
+cheap at request time. Startup still performs one-time artifact verification,
+sample loading, and visualization encoding. `POST /predict` is the only
+request route that performs ONNX inference and is the cost-sensitive operation.
+
+The public-release implementation now memoizes the complete response for each
+of the two fixed sample IDs in the warm instance. The response contract is
+unchanged, and the cached response retains the first inference's `latency_ms`
+value for frontend compatibility. Different sample IDs have separate entries;
+unknown IDs are rejected before cache lookup. Threshold changes are entirely
+client-side and do not call `/predict`.
+
+This is a bounded duplicate-work control, not a rate limit or daily quota. It
+cannot protect a request that arrives after scale-to-zero has discarded the
+cache, and it is not a substitute for selecting a small server-side abuse
+policy before anonymous access.
 
 Minimum application-side protection before public release:
 
 - reject unknown sample IDs (already implemented)
 - keep one inference worker / concurrency `1`
-- add a server-side rate limit for `POST /predict`
+- use the fixed-sample in-process cache (implemented in the prepared code)
+- select and implement a server-side rate limit or daily quota if anonymous
+  traffic is allowed; the cache alone is not sufficient abuse protection
 - optionally add a project-wide daily inference quota with HTTP `429` when exhausted
 - log rate-limit events without storing sensitive request data
 
