@@ -28,8 +28,10 @@ checks; INT8 and INT4 results remain experimental.
 See [`docs/model-selection.md`](docs/model-selection.md) for the complete
 protocol, limitations, and optimization results. The selected model now runs
 in a local FastAPI service and CPU-only Docker image with an interactive,
-threshold-sensitive visualization dashboard. The next milestone is Cloud Run
-deployment.
+threshold-sensitive visualization dashboard. An authenticated/private Phase 5
+Cloud Run deployment is now live; see
+[`docs/phase5-cloud-deployment.md`](docs/phase5-cloud-deployment.md) for the
+observed revision, image provenance, configuration, and verification results.
 
 ## Local inference API
 
@@ -96,10 +98,18 @@ checkpoint redistribution remain unapproved.
 See [`docs/setup-pc-pop.md`](docs/setup-pc-pop.md). Large research artifacts are
 private, untracked, and verified from [`manifests/models.toml`](manifests/models.toml).
 
+## Private cloud deployment
+
+The production image deliberately excludes the private model and sample
+artifacts. Cloud Run uses the attached runtime service account and stages the
+checksum-verified GCS objects into ephemeral `/tmp` storage at startup. The
+initial service requires authentication, scales from zero to one instance, and
+does not expose the artifact bucket or anonymous inference.
+
 ## Project direction
 
 The complete implementation plan is in [`plan.md`](plan.md). The next milestone
-is Phase 5: checksum-verified artifact delivery and deployment to Cloud Run.
+is Phase 6: measured cold/warm and repeated-request performance evidence.
 
 ## License
 

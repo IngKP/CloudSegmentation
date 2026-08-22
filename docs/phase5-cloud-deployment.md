@@ -6,6 +6,71 @@ Deploy the Phase 4 CloudSegmentation application to Google Cloud Run while keepi
 
 The deployment should demonstrate Cloud Run, Artifact Registry, Cloud Storage, IAM, logging, monitoring, and cost controls without turning the portfolio project into a large infrastructure project.
 
+## Actual initial/private deployment
+
+The initial private deployment was completed and verified on 2026-08-22. It is
+authenticated-only; anonymous/public inference was deliberately not enabled.
+
+### Application implementation
+
+- `app/staging.py` detects the complete `CLOUDSEG_GCS_*` configuration and
+  downloads the manifest-selected FP32 ONNX model plus every sample in the
+  tracked sample manifest to a unique writable `/tmp/cloudseg/...` directory.
+- Downloads use `google.cloud.storage.Client()` with Application Default
+  Credentials. No service-account key file is read, created, or included in the
+  image.
+- Every staged object is verified with the existing size/SHA-256 integrity
+  mechanism before the existing sample loader and one ONNX Runtime session are
+  initialized.
+- If the GCS variables are absent, the existing local filesystem paths remain
+  active. The production Docker image contains application code and manifests
+  only; model and NPZ files are not copied into it.
+
+### Observed deployment record
+
+| Item | Observed value |
+| --- | --- |
+| Project / region | `cloudsegmentation-506305` / `asia-northeast1` |
+| Service | `cloudsegmentation` |
+| Private URL | `https://cloudsegmentation-3cqmz4dvmq-an.a.run.app` |
+| Revision | `cloudsegmentation-00003-k7c` |
+| Source commit / image tag | `679ba1419819e7eeee8c1157876ad69f0fc98e67` |
+| Artifact Registry image | `asia-northeast1-docker.pkg.dev/cloudsegmentation-506305/cloudsegmentation/cloudsegmentation:679ba1419819e7eeee8c1157876ad69f0fc98e67` |
+| Registry manifest digest | `sha256:a60f3e26417758a12ceae13a97528b962223d99dc2f22aba1016459725402361` |
+| Revision-resolved image digest | `sha256:843d7133cf5978dce0c3aac4f9d04621cae2c9022ac4ea9c9972749dfecbfaf2` |
+| Runtime service account | `cloudseg-runtime@cloudsegmentation-506305.iam.gserviceaccount.com` |
+| CPU / memory | `1` vCPU / `2Gi` |
+| Scaling / concurrency | min `0`, max `1`, concurrency `1` |
+| Billing / GPU | request-based CPU throttling / none configured |
+
+The private artifact bucket and runtime service account were reused. The
+`cloudsegmentation` Artifact Registry Docker repository was created because it
+did not exist. Cloud Run service IAM contains one explicit owner-user
+`roles/run.invoker` binding for authenticated verification; it contains no
+`allUsers` or `allAuthenticatedUsers` binding. The bucket has uniform
+bucket-level access and public access prevention enforced, with the runtime
+service account granted only bucket-scoped `roles/storage.objectViewer`.
+
+No billing accounts, budgets, spend caps, payment settings, organization
+settings, or unrelated infrastructure were changed.
+
+### Verification results
+
+- Anonymous `GET /health`: `403`.
+- Authenticated `GET /health`: `200`, model `garg_benchmark_seed42`, FP32,
+  two samples, and the expected Sen1Floods11 all-water target semantics.
+- Authenticated `GET /samples`: `200`, listing `Sri-Lanka_713926` and
+  `India_80221`.
+- Authenticated dashboard `/`, `/static/app.js`, SAR visualization, and
+  reference visualization: `200`.
+- Authenticated live inference succeeded once for each sample. Observed model
+  latency was approximately `1721 ms` for Sri Lanka and `1699 ms` for India;
+  these are two verification requests, not a benchmark estimate.
+- Cloud Run logs contain `gcs_artifacts_staged`, `service_ready`, and
+  `prediction_complete` messages with bucket/object/sample/model/latency
+  metadata only. No error-level entries or large tensors/credentials were
+  observed in the final verification window.
+
 ## Security and cost principles
 
 1. **Use a dedicated GCP project for this demo.** Do not share the project with unrelated workloads.
