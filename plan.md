@@ -892,11 +892,23 @@ and valid-pixel metrics locally without rerunning the model.
 
 **Estimated difficulty: 2–3/5**
 
-* cold/warm latency
-* sequential requests
-* concurrent requests
-* autoscaling test
-* Cloud Monitoring screenshots
+### Phase 6A — Existing private deployment performance
+
+**Status: complete.** See [`docs/phase6-performance.md`](docs/phase6-performance.md).
+The existing authenticated revision was measured without changing its
+configuration:
+
+* verified the deployed revision and Cloud Run configuration
+* measured a post-scale-to-zero cold request and separated startup/model time
+* measured 20 warm sequential requests
+* measured 1, 2, and 5 concurrent clients with five requests per client
+* inspected Cloud Run logs and one-minute Monitoring CPU, memory, request,
+  latency, and instance observations
+
+### Phase 6B — Controlled autoscaling experiment
+
+**Status: deferred.** Temporarily increasing max instances to 2 or more is a
+separate controlled task and was intentionally not performed in Phase 6A.
 
 **Deliverable:** production-style performance section.
 

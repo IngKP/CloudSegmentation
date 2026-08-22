@@ -12,7 +12,10 @@ mapping readiness.
 
 ## Current phase
 
-Phases 1–4 are complete. The focused audit compared:
+Phases 1–4 are complete. Phase 5 is a live authenticated/private Cloud Run
+deployment, and Phase 6A has measured its cold-start, warm, sequential, and
+bounded-concurrency performance. The separate max-instances-2 autoscaling
+experiment remains deferred. The focused audit compared:
 
 - 2-channel U-Net (VV + VH)
 - 5-channel U-Net (VV + VH + DEM + HAND + Water)
@@ -32,6 +35,8 @@ threshold-sensitive visualization dashboard. An authenticated/private Phase 5
 Cloud Run deployment is now live; see
 [`docs/phase5-cloud-deployment.md`](docs/phase5-cloud-deployment.md) for the
 observed revision, image provenance, configuration, and verification results.
+See [`docs/phase6-performance.md`](docs/phase6-performance.md) for the Phase
+6A deployment/performance evidence and its limitations.
 
 ## Local inference API
 
@@ -108,8 +113,9 @@ does not expose the artifact bucket or anonymous inference.
 
 ## Project direction
 
-The complete implementation plan is in [`plan.md`](plan.md). The next milestone
-is Phase 6: measured cold/warm and repeated-request performance evidence.
+The complete implementation plan is in [`plan.md`](plan.md). Phase 6A is
+complete; a controlled autoscaling experiment, if approved separately, remains
+the next Phase 6 task.
 
 ## License
 
