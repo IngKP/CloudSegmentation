@@ -379,18 +379,19 @@ The Phase 5 deliverable is not simply "a public URL." A secure authenticated dep
 
 ## Final public release record
 
-The existing Cloud Run service was updated and made public only after the new
-revision passed the private verification gate.
+The existing Cloud Run service was rebuilt from the clean release commit and
+updated only after the image passed the production-content check. The new
+revision remains public and serves 100% of traffic.
 
 | Item | Observed value |
 | --- | --- |
 | Deployment date | 2026-08-22 UTC |
 | Project / region | `cloudsegmentation-506305` / `asia-northeast1` |
 | Service | `cloudsegmentation` |
-| New revision | `cloudsegmentation-release-835a206e` |
-| Source commit / immutable image tag | `835a206e625a54572c6a854c6539b9eb4c6a6db3` |
-| Artifact Registry image | `asia-northeast1-docker.pkg.dev/cloudsegmentation-506305/cloudsegmentation/cloudsegmentation:835a206e625a54572c6a854c6539b9eb4c6a6db3` |
-| Registry manifest digest | `sha256:714920c6c9ba2d6ae632945f7e7710445353748ed3b374d5d31b18c7a129afd5` |
+| New revision | `cloudsegmentation-release-25276f18` |
+| Source commit / immutable image tag | `25276f18d9b1f24a3063eb02eb98fbeaf92ab3d0` |
+| Artifact Registry image | `asia-northeast1-docker.pkg.dev/cloudsegmentation-506305/cloudsegmentation/cloudsegmentation:25276f18d9b1f24a3063eb02eb98fbeaf92ab3d0` |
+| Registry manifest digest | `sha256:a8a7e54338bbc8aa55a49906717441f4277984e719d982291d5be1b7e65cf15b` |
 | Revision-resolved image digest | `sha256:fd2e5615816c528bf3284958de2295b3cc782e557eb5a0675d7ddad1e762fcb3` |
 | Public demo URL | `https://cloudsegmentation-622822429157.asia-northeast1.run.app/` |
 | Alternate service URL | `https://cloudsegmentation-3cqmz4dvmq-an.a.run.app/` |
@@ -422,15 +423,18 @@ zero error-level entries, and no credential/tensor/request-body markers. Public
 verification repeated the route, visualization, inference, cache, 429, and
 unknown-sample checks without Authorization headers.
 
-The image scan found no `*.onnx` or `*.npz` files, credential files, or
-service-account key material. The model and sample objects remain in the
-private bucket `gs://cloudsegmentation-506305-artifacts`, which retains public
-access prevention and uniform bucket-level access. The runtime identity has
-only bucket-scoped `roles/storage.objectViewer`; direct unauthenticated GETs
-to the model and both sample objects returned 403 after public service access
-was enabled. The UI shows: “Data: Sen1Floods11 — Cloud to Street · Bonafilia
-et al., CVPRW 2020”. The upstream repository does not state an explicit dataset
-license, and the release decision does not treat citation as legal permission.
+The clean release image scan found no `*.onnx` or `*.npz` files, credential
+files, or service-account key material. Anonymous verification of `/`,
+`/health`, `/samples`, both sample visualizations, and first/repeated
+`POST /predict` requests returned 200; the repeated requests produced
+`prediction_cache_hit` log entries for both samples. The model and sample
+objects remain in the private bucket `gs://cloudsegmentation-506305-artifacts`,
+which retains enforced public access prevention and uniform bucket-level
+access with no public IAM members. Direct unauthenticated GETs to the model and
+both sample objects returned 403 after public service access was enabled. The
+UI shows: “Data: Sen1Floods11 — Cloud to Street · Bonafilia et al., CVPRW
+2020”. The upstream repository does not state an explicit dataset license, and
+the release decision does not treat citation as legal permission.
 
 No unrelated GCP infrastructure was created or changed in this release. The
 existing Cloud Run service, Artifact Registry repository, private bucket, and
