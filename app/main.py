@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -32,6 +33,11 @@ from app.staging import resolve_artifact_paths
 
 logger = logging.getLogger("cloudsegmentation")
 logger.setLevel(logging.INFO)
+if not logger.handlers:
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
+    logger.addHandler(stream_handler)
+logger.propagate = False
 FRONTEND_ROOT = Path(__file__).resolve().parents[1] / "frontend"
 
 
