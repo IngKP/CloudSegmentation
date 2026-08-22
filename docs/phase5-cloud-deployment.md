@@ -217,34 +217,36 @@ describes the dataset and links to its source repository, but does not resolve
 those file-use rights. The repository's still-open
 [missing-license issue](https://github.com/cloudtostreet/Sen1Floods11/issues/18)
 has no maintainer licensing response. Therefore, attribution is included in
-the UI and README, but it is not being treated as permission. Public display
-or redistribution of the two derived demo samples remains blocked pending
-written permission or replacement with authorized assets.
+the UI and README, but it is not being treated as permission. The project
+owner has explicitly accepted public display of the two derived demo
+visualizations for this portfolio release with attribution. This is an
+accepted release decision rather than evidence of an upstream dataset license;
+citation itself does not create legal permission for redistribution.
 
 ## Public-release gate
 
 Anonymous access is **not part of the initial deployment**.
 
-Before making the Cloud Run service public, all of the following must be true:
+At the final public release, the following were true before the service-level
+Invoker IAM check was disabled:
 
-- [ ] Cloud Run works correctly while authenticated.
-- [ ] Model and sample artifacts download from GCS and pass checksum verification.
-- [ ] Runtime service account has only bucket-scoped read access.
-- [ ] Artifact bucket has public access prevention enabled.
-- [ ] Artifact bucket has uniform bucket-level access enabled.
-- [ ] Cloud Run minimum instances is `0`.
-- [ ] Cloud Run service-level maximum instances is `1`.
-- [ ] Cloud Run concurrency is `1`.
-- [ ] Request-based billing is enabled.
-- [ ] Normal budget alerts are configured.
-- [ ] Cloud Run spend cap is configured if available.
-- [ ] Logging has been checked for accidental sensitive-data output.
-- [ ] Sen1Floods11/model redistribution and public-display constraints are resolved for the assets shown by the UI.
-- [ ] A server-side inference abuse policy has been selected.
+- [x] Cloud Run works correctly while authenticated.
+- [x] Model and sample artifacts download from GCS and pass checksum verification.
+- [x] Runtime service account has only bucket-scoped read access.
+- [x] Artifact bucket has public access prevention enabled.
+- [x] Artifact bucket has uniform bucket-level access enabled.
+- [x] Cloud Run minimum instances is `0`.
+- [x] Cloud Run service-level maximum instances is `1`.
+- [x] Cloud Run concurrency is `1`.
+- [x] Request-based billing is enabled.
+- [x] Pre-existing budget alerts and spend-cap controls were retained; no billing settings were changed in this release.
+- [x] Logging has been checked for accidental sensitive-data output.
+- [x] The project owner has explicitly accepted public display of the two derived Sen1Floods11 visualizations with attribution. The upstream repository's lack of an explicit dataset license remains documented and is not being represented as permission.
+- [x] A server-side inference abuse policy has been selected and implemented.
 
 ## Anonymous inference abuse controls
 
-If the demo is later made public, protect the expensive route separately from the static/read-only routes.
+For the public demo, protect the expensive route separately from the static/read-only routes.
 
 `GET /`, `/static/*`, `/health`, `/samples`, and cached visualization routes are
 cheap at request time. Startup still performs one-time artifact verification,
@@ -260,17 +262,20 @@ client-side and do not call `/predict`.
 
 This is a bounded duplicate-work control, not a rate limit or daily quota. It
 cannot protect a request that arrives after scale-to-zero has discarded the
-cache, and it is not a substitute for selecting a small server-side abuse
-policy before anonymous access.
+cache. It is paired with a process-wide fixed-window rate limit of 30 valid
+prediction requests per 60 seconds by default. `CLOUDSEG_PREDICTION_RATE_LIMIT`
+can lower or raise that limit for a deployment. Cached and uncached valid
+predictions both consume a slot; requests over the limit return HTTP 429 with
+`Retry-After`. The limiter is intentionally in-process and relies on the
+service-level maximum of one instance for this low-traffic demo.
 
-Minimum application-side protection before public release:
+The public release includes these application-level protections:
 
 - reject unknown sample IDs (already implemented)
 - keep one inference worker / concurrency `1`
 - use the fixed-sample in-process cache (implemented in the prepared code)
-- select and implement a server-side rate limit or daily quota if anonymous
-  traffic is allowed; the cache alone is not sufficient abuse protection
-- optionally add a project-wide daily inference quota with HTTP `429` when exhausted
+- keep the process-wide 30-per-minute prediction rate limit enabled; the cache
+  alone is not sufficient abuse protection
 - log rate-limit events without storing sensitive request data
 
 Do not rely on a disabled button, JavaScript cooldown, or any other browser-only mechanism; clients can call the API directly.
@@ -348,9 +353,11 @@ Verify:
 
 Only after the public-release gate is complete:
 
-- resolve public-display/redistribution permission for the demo assets
-- add server-side inference rate/quota protection
-- make the service anonymous only if desired
+- record the explicit public-display decision for the demo assets and retain
+  factual attribution/license caveats
+- verify the process-wide prediction rate limit with cached and uncached calls
+- retain the server-side inference rate-limit protection
+- disable the Invoker IAM check only for this existing service, after private verification
 - immediately verify anonymous access cannot reach private GCS objects directly
 - confirm `max instances = 1` and budget/spend-cap settings after the change
 
@@ -366,6 +373,67 @@ A **guarded Cloud Run deployment** with:
 - billing alerts and spend-cap protection where available
 - Cloud Logging/Monitoring visibility
 - authenticated working demo first
-- optional public demo only after explicit security, licensing, and abuse-control checks
+- public demo only after explicit security, attribution/license caveat, and abuse-control checks
 
 The Phase 5 deliverable is not simply "a public URL." A secure authenticated deployment with documented public-release controls counts as Phase 5 complete; anonymous publication is a separate release decision.
+
+## Final public release record
+
+The existing Cloud Run service was updated and made public only after the new
+revision passed the private verification gate.
+
+| Item | Observed value |
+| --- | --- |
+| Deployment date | 2026-08-22 UTC |
+| Project / region | `cloudsegmentation-506305` / `asia-northeast1` |
+| Service | `cloudsegmentation` |
+| New revision | `cloudsegmentation-release-835a206e` |
+| Source commit / immutable image tag | `835a206e625a54572c6a854c6539b9eb4c6a6db3` |
+| Artifact Registry image | `asia-northeast1-docker.pkg.dev/cloudsegmentation-506305/cloudsegmentation/cloudsegmentation:835a206e625a54572c6a854c6539b9eb4c6a6db3` |
+| Registry manifest digest | `sha256:714920c6c9ba2d6ae632945f7e7710445353748ed3b374d5d31b18c7a129afd5` |
+| Revision-resolved image digest | `sha256:fd2e5615816c528bf3284958de2295b3cc782e557eb5a0675d7ddad1e762fcb3` |
+| Public demo URL | `https://cloudsegmentation-622822429157.asia-northeast1.run.app/` |
+| Alternate service URL | `https://cloudsegmentation-3cqmz4dvmq-an.a.run.app/` |
+| Runtime service account | `cloudseg-runtime@cloudsegmentation-506305.iam.gserviceaccount.com` |
+| CPU / memory | `1` vCPU / `2Gi` |
+| Minimum / service maximum / revision maximum | `0` / `1` / `1` |
+| Concurrency / billing / GPU | `1` / request-based / none |
+
+Public access was enabled with the recommended existing-service command
+`gcloud run services update cloudsegmentation --no-invoker-iam-check`, which
+disables the Invoker IAM check for this service without adding an
+`allUsers`/`allAuthenticatedUsers` IAM binding. The service continued serving
+100% traffic from the new revision.
+
+The prediction abuse policy is a process-wide fixed window of 30 valid
+`POST /predict` requests per 60 seconds by default, configurable with
+`CLOUDSEG_PREDICTION_RATE_LIMIT`. Cached and uncached valid predictions both
+count; excess requests return HTTP 429 with `Retry-After`. Unknown sample IDs
+are rejected with 404 before quota consumption. Each known sample has one
+ephemeral per-instance response-cache entry: the first request runs ONNX and
+repeated warm-instance requests produce `prediction_cache_hit` log entries
+without another inference. Cache state disappears on scale-to-zero or a new
+revision.
+
+Private verification before public access included authenticated and
+unauthenticated route checks, both sample visualizations, first and repeated
+inference for both samples, a deliberate 429, cache-hit and rate-limit logs,
+zero error-level entries, and no credential/tensor/request-body markers. Public
+verification repeated the route, visualization, inference, cache, 429, and
+unknown-sample checks without Authorization headers.
+
+The image scan found no `*.onnx` or `*.npz` files, credential files, or
+service-account key material. The model and sample objects remain in the
+private bucket `gs://cloudsegmentation-506305-artifacts`, which retains public
+access prevention and uniform bucket-level access. The runtime identity has
+only bucket-scoped `roles/storage.objectViewer`; direct unauthenticated GETs
+to the model and both sample objects returned 403 after public service access
+was enabled. The UI shows: “Data: Sen1Floods11 — Cloud to Street · Bonafilia
+et al., CVPRW 2020”. The upstream repository does not state an explicit dataset
+license, and the release decision does not treat citation as legal permission.
+
+No unrelated GCP infrastructure was created or changed in this release. The
+existing Cloud Run service, Artifact Registry repository, private bucket, and
+runtime identity were reused. Pre-existing billing controls were not modified;
+the deployer identity could not read the Billing Budgets API because that API
+was disabled/permission-limited, so no budget mutation was attempted.

@@ -24,6 +24,7 @@ from app.artifacts import (
 )
 from app.config import Settings
 from app.inference import InferenceEngine, SessionFactory, create_session
+from app.rate_limit import process_prediction_rate_limiter
 from app.schemas import (
     HealthResponse,
     PredictRequest,
@@ -83,6 +84,9 @@ def create_app(
             "visuals": visuals,
             "prediction_cache": {},
             "prediction_cache_lock": Lock(),
+            "prediction_rate_limiter": process_prediction_rate_limiter(
+                resolved.prediction_rate_limit
+            ),
         }
         logger.info(
             "service_ready model_id=%s variant=%s sample_count=%d",
@@ -159,6 +163,14 @@ def create_app(
         sample = state["samples"].get(request.sample_id)
         if sample is None:
             raise HTTPException(status_code=404, detail="unknown sample ID")
+        retry_after = state["prediction_rate_limiter"].acquire()
+        if retry_after is not None:
+            logger.info("prediction_rate_limit_exceeded")
+            raise HTTPException(
+                status_code=429,
+                detail="prediction rate limit exceeded",
+                headers={"Retry-After": str(retry_after)},
+            )
         with state["prediction_cache_lock"]:
             cached = state["prediction_cache"].get(request.sample_id)
             if cached is not None:

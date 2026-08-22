@@ -14,12 +14,18 @@ class Settings:
     model_manifest_path: Path
     sample_manifest_path: Path
     ort_threads: int = 1
+    prediction_rate_limit: int = 30
 
     @classmethod
     def from_environment(cls) -> Settings:
         threads = int(os.environ.get("CLOUDSEG_ORT_THREADS", "1"))
         if threads < 1:
             raise ValueError("CLOUDSEG_ORT_THREADS must be at least 1")
+        prediction_rate_limit = int(
+            os.environ.get("CLOUDSEG_PREDICTION_RATE_LIMIT", "30")
+        )
+        if prediction_rate_limit < 1:
+            raise ValueError("CLOUDSEG_PREDICTION_RATE_LIMIT must be at least 1")
         return cls(
             model_path=Path(
                 os.environ.get(
@@ -31,4 +37,5 @@ class Settings:
             model_manifest_path=REPOSITORY_ROOT / "manifests/optimized_models.toml",
             sample_manifest_path=REPOSITORY_ROOT / "manifests/demo_samples.toml",
             ort_threads=threads,
+            prediction_rate_limit=prediction_rate_limit,
         )

@@ -17,6 +17,11 @@ WORKDIR /build
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 
+# Dependency distributions may include optional test fixtures. Keep the
+# production virtual environment free of model/sample-looking artifacts; the
+# application model and samples are staged privately at runtime instead.
+RUN find /opt/venv -type f \( -name '*.onnx' -o -name '*.npz' \) -delete
+
 FROM python:3.12-slim-bookworm AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

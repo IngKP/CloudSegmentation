@@ -184,14 +184,22 @@ After private deployment:
 
 ## Public-access gate
 
-Do not proceed to anonymous/public inference as part of this task.
+The original initial-deployment gate below was intentionally private-only. For
+the current portfolio release, the project owner has explicitly accepted
+public display of the two derived visualizations with factual attribution.
+That decision does not claim an explicit upstream dataset license or create
+legal permission through citation.
 
 Reasons:
 
-- Current demo routes expose derived sample/reference imagery, and public redistribution permission for these Sen1Floods11-derived assets has not yet been resolved.
-- Public inference also needs an application-level persistent global inference quota/rate-limit design.
+- The upstream Sen1Floods11 repository does not state an explicit dataset
+  license; retain that caveat in release documentation.
+- Public inference requires the implemented process-wide prediction rate limit
+  (`CLOUDSEG_PREDICTION_RATE_LIMIT`, default 30 valid requests per 60 seconds)
+  in addition to the per-sample cache.
 
-A later task can decide whether to keep the live service authenticated, replace demo assets, or add public-abuse controls before anonymous access.
+Anonymous access remains a separate final step: complete private verification
+first, then disable the Cloud Run Invoker IAM check only for this service.
 
 ## Definition of completion for this handoff
 
@@ -203,5 +211,6 @@ This task is complete when:
 - Docker image is built and pushed without private artifacts embedded.
 - Cloud Run is deployed privately with the required resource limits and runtime identity.
 - The authenticated UI and inference work against the cloud deployment.
-- No public-access IAM binding was added.
+- Public access, if enabled, is added only after the private verification gate
+  and does not make the GCS bucket public.
 - Relevant deployment documentation is updated with what was actually done.

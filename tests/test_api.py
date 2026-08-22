@@ -4,6 +4,7 @@ import base64
 import hashlib
 import io
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -105,6 +106,7 @@ sha256 = "{_sha256(model)}"
         model_manifest_path=model_manifest,
         sample_manifest_path=sample_manifest,
         ort_threads=1,
+        prediction_rate_limit=30,
     )
     return settings, FakeSession()
 
@@ -223,6 +225,43 @@ def test_prediction_cache_is_separate_per_sample(tmp_path: Path) -> None:
     assert first_demo.json()["sample_id"] == "demo"
     assert first_alternate.json()["sample_id"] == "alternate"
     assert session.calls == 2
+
+
+def test_prediction_rate_limit_allows_requests_below_limit(tmp_path: Path) -> None:
+    settings, session = make_settings(tmp_path)
+    settings = replace(settings, prediction_rate_limit=3)
+
+    with TestClient(create_app(settings, lambda _path, _threads: session)) as client:
+        responses = [
+            client.post("/predict", json={"sample_id": "demo"}),
+            client.post("/predict", json={"sample_id": "demo"}),
+        ]
+
+    assert [response.status_code for response in responses] == [200, 200]
+    assert session.calls == 1
+
+
+def test_prediction_rate_limit_counts_cached_valid_requests(tmp_path: Path) -> None:
+    settings, session = make_settings(tmp_path)
+    settings = replace(settings, prediction_rate_limit=2)
+
+    with TestClient(create_app(settings, lambda _path, _threads: session)) as client:
+        assert client.post("/predict", json={"sample_id": "demo"}).status_code == 200
+        assert client.post("/predict", json={"sample_id": "demo"}).status_code == 200
+        limited = client.post("/predict", json={"sample_id": "demo"})
+
+    assert limited.status_code == 429
+    assert int(limited.headers["retry-after"]) >= 1
+    assert session.calls == 1
+
+
+def test_unknown_sample_does_not_consume_prediction_rate_limit(tmp_path: Path) -> None:
+    settings, session = make_settings(tmp_path)
+    settings = replace(settings, prediction_rate_limit=1)
+
+    with TestClient(create_app(settings, lambda _path, _threads: session)) as client:
+        assert client.post("/predict", json={"sample_id": "missing"}).status_code == 404
+        assert client.post("/predict", json={"sample_id": "demo"}).status_code == 200
 
 
 def test_threshold_exploration_is_client_side() -> None:
