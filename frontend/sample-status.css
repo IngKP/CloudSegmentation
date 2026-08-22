@@ -1,11 +1,17 @@
 .sample-card-status {
   margin-left: auto;
   margin-right: 16px;
-  color: var(--cyan);
+  color: var(--color-primary-blue);
   font-size: 10px;
   letter-spacing: .08em;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.sample-card:hover .sample-card-status,
+.sample-card:focus-visible .sample-card-status,
+.sample-card.selected .sample-card-status {
+  color: var(--color-light);
 }
 
 .sample-card-status[hidden] {
