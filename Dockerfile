@@ -40,7 +40,8 @@ USER cloudseg
 EXPOSE 8080
 
 # Python's standard library is sufficient for a dependency-free readiness
-# probe; model and sample artifacts are mounted read-only at runtime.
+# probe. Cloud deployments stage private artifacts into writable /tmp from GCS;
+# local Docker development may still mount the local artifact paths above.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD ["/opt/venv/bin/python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8080') + '/health', timeout=2).read()"]
 

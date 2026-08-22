@@ -28,6 +28,7 @@ from app.schemas import (
     PredictResponse,
     SampleResponse,
 )
+from app.staging import resolve_artifact_paths
 
 logger = logging.getLogger("cloudsegmentation")
 FRONTEND_ROOT = Path(__file__).resolve().parents[1] / "frontend"
@@ -43,8 +44,18 @@ def create_app(
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         model_manifest = load_toml(resolved.model_manifest_path)
         sample_manifest = load_toml(resolved.sample_manifest_path)
-        artifact = selected_model(model_manifest, resolved.model_path)
-        samples = load_samples(sample_manifest, resolved.sample_root)
+        try:
+            artifact_paths = resolve_artifact_paths(
+                resolved.model_path,
+                resolved.sample_root,
+                model_manifest,
+                sample_manifest,
+            )
+        except Exception as exc:
+            logger.exception("startup_artifact_staging_failed")
+            raise RuntimeError(f"startup artifact staging failed: {exc}") from exc
+        artifact = selected_model(model_manifest, artifact_paths.model_path)
+        samples = load_samples(sample_manifest, artifact_paths.sample_root)
         visuals = {
             sample_id: {
                 "sar": encode_sar_visualization(sample.tensor),
@@ -53,11 +64,12 @@ def create_app(
             for sample_id, sample in samples.items()
         }
         engine = InferenceEngine(
-            resolved.model_path, model_manifest, resolved.ort_threads, session_factory
+            artifact_paths.model_path, model_manifest, resolved.ort_threads, session_factory
         )
         application.state.runtime = {
             "model_manifest": model_manifest,
             "artifact": artifact,
+            "artifact_paths": artifact_paths,
             "samples": samples,
             "engine": engine,
             "visuals": visuals,
