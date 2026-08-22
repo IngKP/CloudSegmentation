@@ -49,10 +49,11 @@
 .metric-note {
   margin: 12px 0 0;
   padding: 12px 14px;
-  border-left: 2px solid var(--orange);
-  background: rgb(255 155 98 / 6%);
-  color: var(--muted);
+  border-left: 2px solid var(--color-primary-blue);
+  border-radius: var(--radius-sm);
+  background: rgb(119 141 169 / 16%);
+  color: var(--color-primary-blue);
   font-size: 11px;
 }
 
-.metric-note strong { color: var(--ink); }
+.metric-note strong { color: var(--color-darkest); }

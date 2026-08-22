@@ -24,21 +24,15 @@
 
     <main>
       <section id="intro" class="scene scene-intro" aria-labelledby="intro-heading">
-        <div class="scene-inner intro-layout">
+        <div class="scene-inner">
           <div class="intro-copy">
             <p class="eyebrow">Sentinel-1 · Surface-water segmentation</p>
             <h1 id="intro-heading">Surface-water segmentation from Sentinel-1 SAR</h1>
             <p class="lede">An interactive deployment of a cross-modal Swin-UNet for segmenting surface water from satellite radar imagery.</p>
             <a class="cta-link" href="#demo">Explore the demo <span aria-hidden="true">↓</span></a>
             <p class="meta-line">SENTINEL-1 · SWIN-UNET · ONNX · CLOUD RUN</p>
+            <p class="intro-note" role="note">This demo segments surface water; it does not distinguish transient floodwater.</p>
           </div>
-          <aside class="caveat" role="note">
-            <span class="caveat-icon" aria-hidden="true">!</span>
-            <div>
-              <strong>Interpretation note</strong>
-              <p>The Sen1Floods11 target contains all surface water, not transient flood events. Scores are model sensitivity—not calibrated risk probabilities.</p>
-            </div>
-          </aside>
         </div>
       </section>
 
@@ -50,79 +44,75 @@
             <p>Select a curated Sentinel-1 scene, run inference, then explore the threshold interactively.</p>
           </div>
 
-          <div class="sample-picker" aria-labelledby="sample-picker-heading">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Curated scenes</p>
-                <h3 id="sample-picker-heading">Choose a scene</h3>
+          <div class="demo-controls">
+            <div class="sample-picker" aria-labelledby="sample-picker-heading">
+              <div class="control-label-row">
+                <span id="sample-picker-heading" class="control-label">Scene</span>
+                <span id="sample-count" class="muted"></span>
               </div>
-              <span id="sample-count" class="muted"></span>
+              <div id="gallery" class="gallery" aria-live="polite"><div class="skeleton"></div><div class="skeleton"></div></div>
             </div>
-            <div id="gallery" class="gallery" aria-live="polite"><div class="skeleton"></div><div class="skeleton"></div></div>
+
+            <section id="workspace" class="workspace hidden" aria-labelledby="results-heading">
+              <h3 id="results-heading" class="sr-only">Inference results</h3>
+
+              <div class="workflow-controls">
+                <div class="run-control">
+                  <button id="run-button" class="primary" type="button">Run inference <span aria-hidden="true">→</span></button>
+                  <div id="run-state" class="run-state" role="status"></div>
+                </div>
+                <div class="threshold-control">
+                  <label class="threshold" for="threshold">Model-score threshold <output id="threshold-value">0.50</output></label>
+                  <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Model-score threshold">
+                  <p class="threshold-note">Updates locally without rerunning inference.</p>
+                </div>
+              </div>
+
+              <div id="error" class="error hidden" role="alert"></div>
+              <div class="meta-row"><span id="scene-label"></span><span id="model-label"></span><span id="latency-label"></span></div>
+
+              <div class="visual-grid">
+                <figure>
+                  <figcaption><span>01</span> SAR input <small>VV + VH grayscale</small></figcaption>
+                  <canvas id="sar-canvas" width="512" height="512"></canvas>
+                  <div class="legend"><span><i class="swatch sar-dark"></i>Lower backscatter</span><span><i class="swatch sar-light"></i>Higher backscatter</span></div>
+                </figure>
+                <figure>
+                  <figcaption><span>02</span> Model score <small>not a calibrated probability</small></figcaption>
+                  <canvas id="score-canvas" width="512" height="512"></canvas>
+                  <div class="legend legend-scale"><span>0 · low water score</span><i class="score-ramp" aria-hidden="true"></i><span>1 · high water score</span></div>
+                </figure>
+                <figure>
+                  <figcaption><span>03</span> Binary prediction <small id="prediction-caption">threshold ≥ 0.50</small></figcaption>
+                  <canvas id="prediction-canvas" width="512" height="512"></canvas>
+                  <div class="legend"><span><i class="swatch predicted-land"></i>Predicted land</span><span><i class="swatch predicted-water"></i>Predicted water</span></div>
+                </figure>
+                <figure>
+                  <figcaption><span>04</span> Prediction overlay <small>prediction on grayscale SAR</small></figcaption>
+                  <canvas id="overlay-canvas" width="512" height="512"></canvas>
+                  <div class="legend"><span><i class="swatch sar-base"></i>SAR background</span><span><i class="swatch overlay-water"></i>Predicted water</span></div>
+                </figure>
+                <figure>
+                  <figcaption><span>05</span> Ground-truth reference <small>used to calculate metrics</small></figcaption>
+                  <canvas id="reference-canvas" width="512" height="512"></canvas>
+                  <div class="legend"><span><i class="swatch reference-land"></i>Reference land</span><span><i class="swatch reference-water"></i>Reference water</span><span><i class="swatch invalid"></i>No reference; excluded</span></div>
+                </figure>
+                <figure>
+                  <figcaption><span>06</span> Prediction errors <small>against ground truth</small></figcaption>
+                  <canvas id="error-canvas" width="512" height="512"></canvas>
+                  <div class="legend"><span><i class="swatch true-positive"></i>Correct water (TP)</span><span><i class="swatch false-positive"></i>False water (FP)</span><span><i class="swatch false-negative"></i>Missed water (FN)</span><span><i class="swatch correct-land"></i>Correct land</span><span><i class="swatch invalid"></i>No reference</span></div>
+                </figure>
+              </div>
+
+              <div class="stats" aria-live="polite">
+                <div><span>IoU</span><strong id="iou">—</strong></div>
+                <div><span>Precision</span><strong id="precision">—</strong></div>
+                <div><span>Recall</span><strong id="recall">—</strong></div>
+                <div class="valid"><span>Ground-truth pixels evaluated</span><strong id="valid-pixels">—</strong></div>
+              </div>
+              <p class="metric-note"><strong>Per-scene diagnostic only.</strong> These two curated tiles are unusually high-performing examples selected for export and UI verification. Their scores are not an estimate of dataset-wide performance; the archived three-seed all-water IoU is 0.7045.</p>
+            </section>
           </div>
-
-          <section id="workspace" class="workspace hidden" aria-labelledby="results-heading">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Inference explorer</p>
-                <h3 id="results-heading">See the signal</h3>
-              </div>
-              <div id="run-state" class="run-state" role="status"></div>
-            </div>
-
-            <div class="toolbar">
-              <button id="run-button" class="primary" type="button">Run inference <span aria-hidden="true">→</span></button>
-              <div class="threshold-control">
-                <label class="threshold" for="threshold">Model-score threshold <output id="threshold-value">0.50</output></label>
-                <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Model-score threshold">
-                <p class="threshold-note">Changing the threshold rerenders the prediction and metrics locally; it does not rerun inference.</p>
-              </div>
-            </div>
-
-            <div id="error" class="error hidden" role="alert"></div>
-            <div class="meta-row"><span id="scene-label"></span><span id="model-label"></span><span id="latency-label"></span></div>
-
-            <div class="visual-grid">
-              <figure>
-                <figcaption><span>01</span> SAR input <small>VV + VH grayscale</small></figcaption>
-                <canvas id="sar-canvas" width="512" height="512"></canvas>
-                <div class="legend"><span><i class="swatch sar-dark"></i>Lower backscatter</span><span><i class="swatch sar-light"></i>Higher backscatter</span></div>
-              </figure>
-              <figure>
-                <figcaption><span>02</span> Model score <small>not a calibrated probability</small></figcaption>
-                <canvas id="score-canvas" width="512" height="512"></canvas>
-                <div class="legend legend-scale"><span>0 · low water score</span><i class="score-ramp" aria-hidden="true"></i><span>1 · high water score</span></div>
-              </figure>
-              <figure>
-                <figcaption><span>03</span> Binary prediction <small id="prediction-caption">threshold ≥ 0.50</small></figcaption>
-                <canvas id="prediction-canvas" width="512" height="512"></canvas>
-                <div class="legend"><span><i class="swatch predicted-land"></i>Predicted land</span><span><i class="swatch predicted-water"></i>Predicted water</span></div>
-              </figure>
-              <figure>
-                <figcaption><span>04</span> Prediction overlay <small>prediction on grayscale SAR</small></figcaption>
-                <canvas id="overlay-canvas" width="512" height="512"></canvas>
-                <div class="legend"><span><i class="swatch sar-base"></i>SAR background</span><span><i class="swatch overlay-water"></i>Predicted water</span></div>
-              </figure>
-              <figure>
-                <figcaption><span>05</span> Ground-truth reference <small>used to calculate metrics</small></figcaption>
-                <canvas id="reference-canvas" width="512" height="512"></canvas>
-                <div class="legend"><span><i class="swatch reference-land"></i>Reference land</span><span><i class="swatch reference-water"></i>Reference water</span><span><i class="swatch invalid"></i>No reference; excluded</span></div>
-              </figure>
-              <figure>
-                <figcaption><span>06</span> Prediction errors <small>against ground truth</small></figcaption>
-                <canvas id="error-canvas" width="512" height="512"></canvas>
-                <div class="legend"><span><i class="swatch true-positive"></i>Correct water (TP)</span><span><i class="swatch false-positive"></i>False water (FP)</span><span><i class="swatch false-negative"></i>Missed water (FN)</span><span><i class="swatch correct-land"></i>Correct land</span><span><i class="swatch invalid"></i>No reference</span></div>
-              </figure>
-            </div>
-
-            <div class="stats" aria-live="polite">
-              <div><span>IoU</span><strong id="iou">—</strong></div>
-              <div><span>Precision</span><strong id="precision">—</strong></div>
-              <div><span>Recall</span><strong id="recall">—</strong></div>
-              <div class="valid"><span>Ground-truth pixels evaluated</span><strong id="valid-pixels">—</strong></div>
-            </div>
-            <p class="metric-note"><strong>Per-scene diagnostic only.</strong> These two curated tiles are unusually high-performing examples selected for export and UI verification. Their scores are not an estimate of dataset-wide performance; the archived three-seed all-water IoU is 0.7045.</p>
-          </section>
         </div>
       </section>
 
