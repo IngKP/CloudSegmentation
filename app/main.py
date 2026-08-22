@@ -31,6 +31,7 @@ from app.schemas import (
 from app.staging import resolve_artifact_paths
 
 logger = logging.getLogger("cloudsegmentation")
+logger.setLevel(logging.INFO)
 FRONTEND_ROOT = Path(__file__).resolve().parents[1] / "frontend"
 
 
