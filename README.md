@@ -8,7 +8,7 @@
 
 CloudSegmentation turns an existing remote-sensing research model into a small production-style inference service. The project covers model selection, ONNX export and fidelity checks, API serving, browser-side threshold exploration, containerization, private artifact handling, deployment, and operational verification.
 
-![CloudSegmentation interactive demo](docs/assets/demo.png)
+![CloudSegmentation inference demo](docs/assets/demo.png)
 
 > **Scope:** Sen1Floods11 provides an all-water reference mask on flood-event scenes. This project therefore demonstrates **surface-water segmentation**, not validated transient-flood mapping, calibrated risk probabilities, or operational flood-response readiness.
 
@@ -30,14 +30,17 @@ The local and Cloud Run latency numbers come from different environments and pro
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    B[Browser UI] -->|GET /samples, POST /predict| R[Cloud Run\nFastAPI service]
-    R --> O[ONNX Runtime\nSwin-UNet]
-    R --> C[Per-sample response cache\n+ rate limiter]
-    G[(Private GCS\nmodel + curated samples)] -->|startup staging\nsize + SHA-256 verification| R
-    R -->|score preview + reference data| B
-    B -->|client-side thresholding| V[Prediction, overlay\nand metrics]
+```text
+Browser
+   │
+   ▼
+Cloud Run
+FastAPI + frontend
+   │
+   ├── ONNX Runtime → Swin-UNet
+   │
+   └── private GCS
+       model + curated samples
 ```
 
 Production uses one CPU, 2 GiB memory, request-based billing, minimum instances 0, maximum instances 1, and container concurrency 1. The browser never receives the private ONNX model or source sample objects.
