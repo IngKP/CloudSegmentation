@@ -8,6 +8,8 @@
 
 CloudSegmentation turns an existing remote-sensing research model into a small production-style inference service. The project covers model selection, ONNX export and fidelity checks, API serving, browser-side threshold exploration, containerization, private artifact handling, deployment, and operational verification.
 
+![CloudSegmentation interactive demo](docs/assets/demo.png)
+
 > **Scope:** Sen1Floods11 provides an all-water reference mask on flood-event scenes. This project therefore demonstrates **surface-water segmentation**, not validated transient-flood mapping, calibrated risk probabilities, or operational flood-response readiness.
 
 ## Highlights
