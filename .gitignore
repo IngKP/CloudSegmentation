@@ -13,17 +13,37 @@ htmlcov/
 !.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+*.crt
+credentials*.json
 service-account*.json
+**/credentials/
+**/secrets/
 
-# Models, data, and generated results
+# Models, datasets, and generated results
 .artifacts/
 data/
 *.onnx
 *.pth
 *.pt
 *.ckpt
+*.safetensors
 *.npy
 *.npz
+*.tif
+*.tiff
+*.geotiff
+*.h5
+*.hdf5
+*.hdf
+
+# Archives commonly used for private artifacts/data
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
 
 # Build and editor state
 build/
